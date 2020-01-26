@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Programify Ltd")]
 [assembly: AssemblyProduct("WinSCP")]
-[assembly: AssemblyCopyright("Copyright © 2020")]
+[assembly: AssemblyCopyright("Source Code Format Copyright © 2020")]
 [assembly: AssemblyTrademark("Programify")]
 [assembly: AssemblyCulture("")]
 
