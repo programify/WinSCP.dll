@@ -46,6 +46,7 @@
     <Compile Include="ChmodEventArgs.cs" />
     <Compile Include="CommandExecutionResult.cs" />
     <Compile Include="ComparisonDifference.cs" />
+    <Compile Include="_ReadMe.cs" />
     <Compile Include="FailedEventArgs.cs" />
     <Compile Include="FileOperationEventArgs.cs" />
     <Compile Include="FilePermissions.cs" />
