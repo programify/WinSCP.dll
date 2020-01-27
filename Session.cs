@@ -221,149 +221,131 @@ public void Abort()
      }
 }
 
-public void Open(SessionOptions sessionOptions)
+//============================================================================
+//                                                                        Open
+//----------------------------------------------------------------------------
+public void Open (SessionOptions sessionOptions)
 {
-     using (Logger.CreateCallstackAndLock())
+     using (Logger.CreateCallstackAndLock ())
      {
-          CheckNotDisposed();
+          CheckNotDisposed () ;
 
           if (Opened)
-          {
-          throw Logger.WriteException(new InvalidOperationException("Session is already opened"));
-          }
+               throw Logger.WriteException (new InvalidOperationException ("Session is already opened")) ;
 
           if (sessionOptions == null)
-          {
-          throw Logger.WriteException(new ArgumentNullException(nameof(sessionOptions)));
-          }
+               throw Logger.WriteException (new ArgumentNullException (nameof (sessionOptions))) ;
 
           try
           {
-          SetupTempPath();
-          ResetOutput();
+               SetupTempPath () ;
+               ResetOutput () ;
 
-          _process = ExeSessionProcess.CreateForSession(this);
+               _process = ExeSessionProcess.CreateForSession (this) ;
 
-          _process.OutputDataReceived += ProcessOutputDataReceived;
+               _process.OutputDataReceived += ProcessOutputDataReceived ;
 
-          _process.Start();
+               _process.Start () ;
 
-          GotOutput();
+               GotOutput () ;
 
           // setup batch mode
-          SendOptionBatchCommand();
-          WriteCommand("option confirm off");
+               SendOptionBatchCommand () ;
+               WriteCommand ("option confirm off") ;
 
-          object reconnectTimeValue;
-          if (ReconnectTime != TimeSpan.MaxValue)
-          {
-               reconnectTimeValue = (int)ReconnectTime.TotalSeconds;
-          }
-          else
-          {
-               reconnectTimeValue = "off";
-          }
-          string reconnectTimeCommand =
-               string.Format(CultureInfo.InvariantCulture, "option reconnecttime {0}", reconnectTimeValue);
-          WriteCommand(reconnectTimeCommand);
+               object reconnectTimeValue ;
+               if (ReconnectTime != TimeSpan.MaxValue)
+                    reconnectTimeValue = (int) ReconnectTime.TotalSeconds ;
+               else
+                    reconnectTimeValue = "off" ;
+               string reconnectTimeCommand = string.Format (CultureInfo.InvariantCulture, "option reconnecttime {0}", reconnectTimeValue) ;
+               WriteCommand (reconnectTimeCommand) ;
 
-          SessionOptionsToUrlAndSwitches(sessionOptions, false, out string command, out string log);
-          const string openCommand = "open ";
-          command = openCommand + command;
-          log = openCommand + log;
-          WriteCommand(command, log);
+               SessionOptionsToUrlAndSwitches (sessionOptions, false, out string command, out string log) ;
+               const string openCommand = "open " ;
+               command = openCommand + command ;
+               log = openCommand + log ;
+               WriteCommand (command, log) ;
 
-          Logger.WriteLine("Waiting for XML log file");
+               Logger.WriteLine ("Waiting for XML log file") ;
 
           // Wait until the log file gets created or WinSCP terminates (in case of fatal error)
-          do
-          {
-               string logExplanation;
-               lock (Output)
+               do
                {
-                    if (_error.Count > 0)
+                    string logExplanation ;
+                    lock (Output)
                     {
-                         logExplanation = GetErrorOutputMessage();
+                         if (_error.Count > 0)
+                              logExplanation = GetErrorOutputMessage () ;
+                         else if (Output.Count > 0)
+                              logExplanation = string.Format (CultureInfo.CurrentCulture, "Output was \"{0}\". ", ListToString (Output)) ;
+                         else
+                              logExplanation = "There was no output. " ;
                     }
-                    else if (Output.Count > 0)
-                    {
-                         logExplanation =
-                              string.Format(CultureInfo.CurrentCulture, "Output was \"{0}\". ", ListToString(Output));
-                    }
-                    else
-                    {
-                         logExplanation = "There was no output. ";
-                    }
-               }
-               logExplanation +=
-                    string.Format(CultureInfo.CurrentCulture,
+                    logExplanation += string.Format (CultureInfo.CurrentCulture,
                          "Response log file {0} was not created. This could indicate lack of write permissions to the log folder or problems starting WinSCP itself.",
-                         XmlLogPath);
+                         XmlLogPath) ;
 
-               if (_process.HasExited && !File.Exists(XmlLogPath))
-               {
-#if !NETSTANDARD
-                    Logger.WriteCounters();
-#endif
-                    Logger.WriteProcesses();
-                    _process.WriteStatus();
-                    string exitCode = string.Format(CultureInfo.CurrentCulture, "{0}", _process.ExitCode);
-                    if (_process.ExitCode < 0)
+                    if (_process.HasExited && ! File.Exists (XmlLogPath))
                     {
-                         exitCode = string.Format(CultureInfo.CurrentCulture, "{0} ({1:X})", exitCode, _process.ExitCode);
+#if !NETSTANDARD
+                         Logger.WriteCounters () ;
+#endif
+                         Logger.WriteProcesses () ;
+                         _process.WriteStatus () ;
+                         string exitCode = string.Format (CultureInfo.CurrentCulture, "{0}", _process.ExitCode) ;
+                         if (_process.ExitCode < 0)
+                              exitCode = string.Format (CultureInfo.CurrentCulture, "{0} ({1:X})", exitCode, _process.ExitCode) ;
+
+                         throw Logger.WriteException (new SessionLocalException (this,
+                              string.Format (CultureInfo.CurrentCulture, "WinSCP process terminated with exit code {0}. ", exitCode) + logExplanation)) ;
                     }
-                    throw Logger.WriteException(
-                         new SessionLocalException(this,
-                              string.Format(CultureInfo.CurrentCulture, "WinSCP process terminated with exit code {0}. ", exitCode) +
-                              logExplanation));
-               }
 
-               Thread.Sleep(50);
+                    Thread.Sleep (50) ;
 
-               CheckForTimeout(
-                    "WinSCP has not responded in time. " +
-                    logExplanation);
+                    CheckForTimeout ("WinSCP has not responded in time. " + logExplanation) ;
 
-          } while (!File.Exists(XmlLogPath));
+               } while (! File.Exists (XmlLogPath)) ;
 
-          Logger.WriteLine("XML log file created");
+               Logger.WriteLine ("XML log file created") ;
 
-          _logReader = new SessionLogReader(this);
+               _logReader = new SessionLogReader (this) ;
 
-          _logReader.WaitForNonEmptyElement("session", LogReadFlags.ThrowFailures);
+               _logReader.WaitForNonEmptyElement ("session", LogReadFlags.ThrowFailures) ;
 
           // special variant of ElementLogReader that throws when closing element (</session>) is encountered
-          _reader = new SessionElementLogReader(_logReader);
+               _reader = new SessionElementLogReader (_logReader) ;
 
           // Skip "open" command <group>
-          WaitForGroup();
+               WaitForGroup () ;
 
-          WriteCommand("pwd");
+               WriteCommand ("pwd") ;
 
-          using (ElementLogReader groupReader = _reader.WaitForGroupAndCreateLogReader())
-          using (ElementLogReader cwdReader = groupReader.WaitForNonEmptyElementAndCreateLogReader("cwd", LogReadFlags.ThrowFailures))
-          {
-               while (cwdReader.Read(0))
+               using (ElementLogReader groupReader = _reader.WaitForGroupAndCreateLogReader ())
                {
-                    if (cwdReader.GetEmptyElementValue("cwd", out string value))
+                    using (ElementLogReader cwdReader = groupReader.WaitForNonEmptyElementAndCreateLogReader("cwd", LogReadFlags.ThrowFailures))
                     {
-                         _homePath = value;
+                         while (cwdReader.Read(0))
+                         {
+                              if (cwdReader.GetEmptyElementValue("cwd", out string value))
+                                   _homePath = value ;
+                         }
+
+                         groupReader.ReadToEnd (LogReadFlags.ThrowFailures) ;
                     }
                }
 
-               groupReader.ReadToEnd(LogReadFlags.ThrowFailures);
-          }
-
-          _sessionTimeout = sessionOptions.Timeout;
+               _sessionTimeout = sessionOptions.Timeout;
           }
           catch (Exception e)
           {
-          Logger.WriteLine("Exception: {0}", e);
-          Cleanup();
-          throw;
+               Logger.WriteLine ("Exception: {0}", e) ;
+               Cleanup () ;
+               throw ;
           }
      }
 }
+
 
 private void SendOptionBatchCommand()
 {
@@ -1697,17 +1679,22 @@ private void Cleanup()
      }
 }
 
-private void WriteCommand(string command)
+
+private void WriteCommand (string command)
 {
-     WriteCommand(command, command);
+     Console.WriteLine ($"WinSCP.dll '{command}'") ;
+
+     WriteCommand (command, command) ;
 }
 
-private void WriteCommand(string command, string log)
+
+private void WriteCommand (string command, string log)
 {
-     Logger.WriteLine("Command: [{0}]", log);
-     _process.ExecuteCommand(command, log);
-     GotOutput();
+     Logger.WriteLine ("Command: [{0}]", log) ;
+     _process.ExecuteCommand (command, log) ;
+     GotOutput () ;
 }
+
 
 private static void ReadElement(CustomLogReader reader, LogReadFlags flags)
 {
@@ -1715,6 +1702,7 @@ private static void ReadElement(CustomLogReader reader, LogReadFlags flags)
      {
      }
 }
+
 
 private void SessionOptionsToUrlAndSwitches(SessionOptions sessionOptions, bool scanFingerprint, out string command, out string log)
 {
